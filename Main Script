@@ -1,0 +1,320 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- ███ GUI Oluştur ███
+local gui = Instance.new("ScreenGui")
+gui.Name = "ElisaHUB"
+gui.ResetOnSpawn = false
+gui.Parent = CoreGui
+
+local mainFrame = Instance.new("Frame", gui)
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 260, 0, 260)
+mainFrame.Position = UDim2.new(0, 20, 0.30, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.TextSize = 24
+title.Text = "Elisa HUB"
+title.TextColor3 = Color3.fromRGB(255, 50, 50)
+title.TextStrokeColor3 = Color3.fromRGB(100, 0, 0)
+title.TextStrokeTransparency = 0.7
+
+local buttonFrame = Instance.new("Frame", mainFrame)
+buttonFrame.Size = UDim2.new(1, -20, 1, -60)
+buttonFrame.Position = UDim2.new(0, 10, 0, 50)
+buttonFrame.BackgroundTransparency = 1
+local layout = Instance.new("UIListLayout", buttonFrame)
+layout.Padding = UDim.new(0, 8)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local function createButton(text)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 240, 0, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Font = Enum.Font.GothamSemibold
+    btn.TextSize = 18
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(50, 0, 0) end)
+    btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30) end)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    return btn
+end
+
+-- ███ Harita Karartma ███
+local originalParts = {}
+local blackMapEnabled = false
+
+local function blackOutMap()
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and not originalParts[part] and part.Transparency < 1 then
+            originalParts[part] = {
+                Color = part.Color, Material = part.Material, Transparency = part.Transparency
+            }
+            part.Color = Color3.new(0, 0, 0)
+            part.Material = Enum.Material.SmoothPlastic
+            part.Transparency = 0
+        end
+    end
+end
+local function restoreMap()
+    for part, data in pairs(originalParts) do
+        if part and part:IsDescendantOf(workspace) then
+            part.Color = data.Color
+            part.Material = data.Material
+            part.Transparency = data.Transparency
+        end
+    end
+    originalParts = {}
+end
+
+-- ███ ESP Sistemi ███
+local ESPColor_Visible = Color3.fromRGB(255, 20, 147)
+local ESPColor_Hidden = Color3.fromRGB(255, 0, 0)
+
+local espEnabled = false
+local healthEspEnabled = false
+local healthPosition = "Alt" -- varsayılan sağlık esp konumu
+
+local espData = {}
+
+local healthOffsets = {
+    ["Üst"] = Vector3.new(0, 3, 0),
+    ["Sağ"] = Vector3.new(1.5, 1.5, 0),
+    ["Sol"] = Vector3.new(-1.5, 1.5, 0),
+    ["Alt"] = Vector3.new(0, -3, 0),
+}
+
+local function createESP(player)
+    if espData[player] and espData[player].Highlight then
+    espData[player].Highlight:Destroy()
+    espData[player].Highlight = nil
+end
+
+    if not player.Character then return end
+    local char = player.Character
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "Elisa_ESP"
+    highlight.FillTransparency = 0
+    highlight.OutlineTransparency = 1
+    highlight.Adornee = char
+    highlight.Parent = char
+
+    if not espData[player] then espData[player] = {} end
+    espData[player].Highlight = highlight
+end
+
+local function removeESP(player)
+    if espData[player] and espData[player].Highlight then
+        espData[player].Highlight:Destroy()
+        espData[player].Highlight = nil
+    end
+end
+
+local function createHealthESP(player)
+    if espData[player] and espData[player].HealthGui then return end
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "HealthESP"
+    billboard.Adornee = hrp
+    billboard.Size = UDim2.new(0, 60, 0, 25)
+    billboard.StudsOffset = healthOffsets[healthPosition] or Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+
+    local textLabel = Instance.new("TextLabel", billboard)
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextSize = 11
+    textLabel.TextStrokeTransparency = 0.7
+    textLabel.TextColor3 = Color3.new(0,1,0)
+    textLabel.Text = "150"
+
+    billboard.Parent = char
+
+    if not espData[player] then espData[player] = {} end
+    espData[player].HealthGui = billboard
+
+    local conn
+    conn = RunService.RenderStepped:Connect(function()
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            if billboard and billboard.Parent then
+                billboard:Destroy()
+            end
+            espData[player].HealthGui = nil
+            if conn then conn:Disconnect() end
+            return
+        end
+        if not humanoid or humanoid.Health <= 0 then
+            if billboard and billboard.Parent then
+                billboard:Destroy()
+            end
+            espData[player].HealthGui = nil
+            if conn then conn:Disconnect() end
+            return
+        end
+        billboard.StudsOffset = healthOffsets[healthPosition] or Vector3.new(0, 3, 0)
+
+        local healthPercent = humanoid.Health / 150  -- 150 üzerinden oran
+        textLabel.Text = tostring(math.floor(humanoid.Health))
+        if healthPercent > 0.75 then
+            textLabel.TextColor3 = Color3.fromRGB(0, 255, 0) -- yeşil
+        elseif healthPercent > 0.5 then
+            textLabel.TextColor3 = Color3.fromRGB(255, 255, 0) -- sarı
+        elseif healthPercent > 0.25 then
+            textLabel.TextColor3 = Color3.fromRGB(255, 165, 0) -- turuncu
+        else
+            textLabel.TextColor3 = Color3.fromRGB(255, 0, 0) -- kırmızı
+        end
+    end)
+end
+
+local function removeHealthESP(player)
+    if espData[player] and espData[player].HealthGui then
+        espData[player].HealthGui:Destroy()
+        espData[player].HealthGui = nil
+    end
+end
+
+local function updateESP()
+    for _, pl in ipairs(Players:GetPlayers()) do
+        if pl ~= LocalPlayer and pl.Character and pl.Character:FindFirstChild("HumanoidRootPart") then
+            if espEnabled then
+                createESP(pl)
+            else
+                removeESP(pl)
+            end
+
+            if healthEspEnabled then
+                createHealthESP(pl)
+            else
+                removeHealthESP(pl)
+            end
+
+            if espData[pl] and espData[pl].Highlight then
+                local hrp = pl.Character:FindFirstChild("HumanoidRootPart")
+                local origin = Camera.CFrame.Position
+                local dir = (hrp.Position - origin)
+                local rayParams = RaycastParams.new()
+                rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                rayParams.FilterDescendantsInstances = {LocalPlayer.Character or LocalPlayer}
+                local result = workspace:Raycast(origin, dir.Unit * dir.Magnitude, rayParams)
+                local visible = result and result.Instance and result.Instance:IsDescendantOf(pl.Character)
+                espData[pl].Highlight.FillColor = visible and ESPColor_Visible or ESPColor_Hidden
+            end
+        else
+            removeESP(pl)
+            removeHealthESP(pl)
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(updateESP)
+
+-- ███ GUI Butonları ███
+local espBtn   = createButton("ESP: KAPALI")
+local healthBtn = createButton("Health ESP: KAPALI")
+local blackBtn = createButton("Harita Siyah: KAPALI")
+
+espBtn.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    espBtn.Text = "ESP: " .. (espEnabled and "AÇIK" or "KAPALI")
+end)
+
+healthBtn.MouseButton1Click:Connect(function()
+    healthEspEnabled = not healthEspEnabled
+    healthBtn.Text = "Health ESP: " .. (healthEspEnabled and "AÇIK" or "KAPALI")
+    dropdownFrame.Visible = healthEspEnabled
+end)
+
+blackBtn.MouseButton1Click:Connect(function()
+    if blackMapEnabled then 
+        restoreMap() 
+    else 
+        blackOutMap() 
+    end
+    blackMapEnabled = not blackMapEnabled
+    blackBtn.Text = "Harita Siyah: " .. (blackMapEnabled and "AÇIK" or "KAPALI")
+end)
+
+espBtn.Parent   = buttonFrame
+healthBtn.Parent = buttonFrame
+blackBtn.Parent = buttonFrame
+
+
+-- ███ Ram Helper anti lag  ███
+Players.PlayerRemoving:Connect(removeESP)
+Players.PlayerAdded:Connect(function(pl)
+    pl.CharacterAdded:Connect(function()
+        task.wait(1)
+        removeESP(pl)
+        removeHealthESP(pl)
+        if espEnabled then createESP(pl) end
+        if healthEspEnabled then createHealthESP(pl) end
+    end)
+end)
+
+-- ███ K Tuşu ile GUI Aç/Kapa
+UserInputService.InputBegan:Connect(function(input, isProcessed)
+    if isProcessed then return end
+    if input.KeyCode == Enum.KeyCode.K then
+        mainFrame.Visible = not mainFrame.Visible
+    end
+end)
+
+--  Loop işte
+-- ESP & Health ESP sürekli güncelleme
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                if espEnabled then
+                    removeESP(player)
+                    createESP(player)
+                else
+                    removeESP(player)
+                end
+
+                if healthEspEnabled then
+                    removeHealthESP(player)
+                    createHealthESP(player)
+                else
+                    removeHealthESP(player)
+                end
+            end
+        end
+    end
+end)
+
+-- loop testi (çalıştı)
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if blackMapEnabled then
+            blackOutMap()
+        end
+    end
+end)
